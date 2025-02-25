@@ -183,6 +183,7 @@ uint16_t dataPlot[320]; //max(width,height) for this display
 volatile static bool dma1_ch1_Active;
 #define ADC_CR1_FASTINT 0x70000 // Fast interleave mode DUAL MODE bits 19-16
 
+
 void setup() {
 
   // BOARD_LED blinks on triggering assuming you have an LED on your board. If not simply dont't define it at the start of the sketch.
@@ -290,6 +291,7 @@ void loop()  {
   }
   
   readHoldButton();
+  readSingleShotButton();
   // Wait before allowing a re-trigger
   delay(retriggerDelay);
 }
@@ -539,6 +541,7 @@ void readSingleShotButton(){
     if( digitalRead(SINGLE_SHOT_BUTTON) ) {
         triggerType = 3;
     }
+}
 
 void readEncoder(){
     encoderAState = digitalRead(ENCODER_OUT_A);   
@@ -550,9 +553,11 @@ void readEncoder(){
        } else {
          scrollRight();
        }
+       
        Serial.print("Position: ");
        Serial.println(counter);
     } 
+    
     encoderALastState = encoderAState; // Updates the previous state of the outputA with the current state
 }
 

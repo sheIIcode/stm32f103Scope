@@ -1,4 +1,4 @@
-/*.
+/*. THIS IS RIGHT VERSION WITH SCROLL
 (c) Andrew Hull - 2015
 
 STM32-O-Scope - aka "The Pig Scope" or pigScope released under the GNU GENERAL PUBLIC LICENSE Version 2, June 1991
@@ -6,8 +6,6 @@ STM32-O-Scope - aka "The Pig Scope" or pigScope released under the GNU GENERAL P
 https://github.com/pingumacpenguin/STM32-O-Scope
 
 Adafruit Libraries released under their specific licenses Copyright (c) 2013 Adafruit Industries.  All rights reserved.
-
-
 
 
 
@@ -115,7 +113,7 @@ int encoderALastState;
 
 // Analog input
 #define ANALOG_MAX_VALUE 4096
-const int8_t analogInPin = PB0;   // Analog input pin: any of LQFP44 pins (PORT_PIN), 10 (PA0), 11 (PA1), 12 (PA2), 13 (PA3), 14 (PA4), 15 (PA5), 16 (PA6), 17 (PA7), 18 (PB0), 19  (PB1)
+const int8_t analogInPin = PB1;   // Analog input pin: any of LQFP44 pins (PORT_PIN), 10 (PA0), 11 (PA1), 12 (PA2), 13 (PA3), 14 (PA4), 15 (PA5), 16 (PA6), 17 (PA7), 18 (PB0), 19  (PB1)
 float samplingTime = 0;
 float displayTime = 0;
 
@@ -134,7 +132,7 @@ int16_t yPosition = 30 ;
 boolean triggerHeld = 0 ;
 
 unsigned long sweepDelayFactor = 1;
-unsigned long timeBase = 50;  //Timebase in microseconds
+unsigned long timeBase = 200;  //Timebase in microseconds
 
 // Screen dimensions
 int16_t myWidth ;
@@ -149,10 +147,10 @@ boolean triggered ;
 // Trigger is setup in one of 32 positions
 #define TRIGGER_POSITION_STEP ANALOG_MAX_VALUE/32
 // Trigger default position (half of full scale)
-int32_t TRIGGER_VALUE = 2048; 
+int32_t TRIGGER_VALUE = 3048; 
 
 int16_t retriggerDelay = 0;
-int8_t triggerType = 3; //0-both 1-negative 2-positive
+int8_t triggerType = 2; //0-both 1-negative 2-positive
 
 //Array for trigger points
 uint16_t triggerPoints[2];
@@ -183,8 +181,10 @@ uint16_t dataPlot[320]; //max(width,height) for this display
 volatile static bool dma1_ch1_Active;
 #define ADC_CR1_FASTINT 0x70000 // Fast interleave mode DUAL MODE bits 19-16
 
+bool _singleShot = false;
 
 void setup() {
+  Timer2.setMode(TIMER_CH3, TIMER_INPUT_CAPTURE_FALL);
 
   // BOARD_LED blinks on triggering assuming you have an LED on your board. If not simply dont't define it at the start of the sketch.
 #if defined BOARD_LED
@@ -258,36 +258,36 @@ void setup() {
 }
 
 void loop()  {
+  
   if ( !triggerHeld  )  {
       // Wait for trigger
       trigger();
   
       if (triggered)   {
-//      if (true)   {
-        // Take our samples
-        
-        takeSamples();
-        blinkLED();
-        
-        //Blank  out previous plot
-        TFTSamplesClear(BEAM_OFF_COLOUR);
-  
-        // Show the showGraticule
-        showGraticule();
-  
-        //Display the samples
-        TFTSamples(BEAM1_COLOUR);
-        displayTime = (micros() - displayTime);
-        
-        // Display the Labels ( uS/Div, Volts/Div etc).
-        showLabels();
-        displayTime = micros();
+          // Take our samples
+          
+          takeSamples();
+          blinkLED();
+          
+          //Blank  out previous plot
+          TFTSamplesClear(BEAM_OFF_COLOUR);
+    
+          // Show the showGraticule
+          showGraticule();
+    
+          //Display the samples
+          TFTSamples(BEAM1_COLOUR);
+          displayTime = (micros() - displayTime);
+          
+          // Display the Labels ( uS/Div, Volts/Div etc).
+          showLabels();
+          displayTime = micros();
   
       } else {
             showGraticule();
       }
   } else {
-    readEncoder();
+      readEncoder();
   }
   
   readHoldButton();
@@ -365,8 +365,11 @@ void trigger()  {
     case 3:
       singleShot() ;
       break;
-    default:
+    case 4:
       triggerBoth() ;
+      break;
+    default:
+      triggered = true;
       break;
   }
 }
@@ -387,14 +390,28 @@ void triggerPositive() {
   triggerPoints[0] = analogRead(analogInPin);
 
   uint32_t time = micros();
+  bool printOnce = false;
   
-  while(triggered == false && micros() - time < 20){
-    Serial.println("stuck");
+  while(triggered == false ){
+    
+    if(printOnce == false){
+        Serial.println("trg +");
+        printOnce = true;  
+    }
+    
     triggerPoints[1] = analogRead(analogInPin);
     if ((triggerPoints[1] > TRIGGER_VALUE) && (triggerPoints[0] < TRIGGER_VALUE) ){
       triggered = true;
     }
     triggerPoints[0] = triggerPoints[1]; //analogRead(analogInPin);
+  }
+  Serial.println("free");
+  
+  if( _singleShot){
+      Serial.print("SS: "); Serial.println(_singleShot);
+     _singleShot = false;
+      triggerHeld = true;
+      triggerType = 5;
   }
 
 }
@@ -411,10 +428,9 @@ void triggerNegative() {
 }
 
 void singleShot() {
-    triggerPositive();
-    triggerHeld = true;
-    
     triggerType = 2;
+    _singleShot = true;
+    
 }
 
 void incEdgeType() {
@@ -538,13 +554,16 @@ void showLabels() {
 }
 
 void readSingleShotButton(){
-    if( digitalRead(SINGLE_SHOT_BUTTON) ) {
+    if( digitalRead(SINGLE_SHOT_BUTTON) == LOW) {
         triggerType = 3;
+        Serial.println("single shot set");
     }
 }
 
 void readEncoder(){
-    encoderAState = digitalRead(ENCODER_OUT_A);   
+    encoderAState = digitalRead(ENCODER_OUT_A);
+    showGraticule();
+    while( digitalRead(ENCODER_OUT_A) == encoderALastState);
 
     if (encoderAState != encoderALastState){     
        // If the outputB state is different to the outputA state, that means the encoder is rotating clockwise
@@ -553,9 +572,6 @@ void readEncoder(){
        } else {
          scrollRight();
        }
-       
-       Serial.print("Position: ");
-       Serial.println(counter);
     } 
     
     encoderALastState = encoderAState; // Updates the previous state of the outputA with the current state
@@ -564,14 +580,15 @@ void readEncoder(){
 void readHoldButton() {
   
   int buttonState = digitalRead(HOLD_BUTTON);
-  while(digitalRead(HOLD_BUTTON) == LOW);
+//  while(digitalRead(HOLD_BUTTON) == LOW);
 
   if(buttonState == LOW){
     toggleHold();
+    Serial.print("trigger held: ");
+    Serial.print(triggerHeld);
+    
     delay(50);
   }
-
-
   
 }
 

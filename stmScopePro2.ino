@@ -184,7 +184,6 @@ volatile static bool dma1_ch1_Active;
 bool _singleShot = false;
 
 void setup() {
-  Timer2.setMode(TIMER_CH3, TIMER_INPUT_CAPTURE_FALL);
 
   // BOARD_LED blinks on triggering assuming you have an LED on your board. If not simply dont't define it at the start of the sketch.
 #if defined BOARD_LED
